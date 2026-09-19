@@ -335,9 +335,9 @@
           <div class="wa-field"><label for="waText">نص المشاركة</label><textarea id="waText"></textarea></div>
           <div class="wa-field"><label for="waFile">صورة المشاركة</label><input type="file" id="waFile" accept="image/*"></div>
           <p class="wa-error" id="waError" style="display:none; color:#c0392b; font-size:.85rem; margin-bottom:.9rem;"></p>
+          <p class="wa-success" id="waSuccess" style="display:none; color:#1f9c86; font-weight:700; font-size:1rem; text-align:center; padding:1rem 0;">تم إرسال مشاركتك بنجاح، شكراً لك! 🌸</p>
           <button type="button" class="wa-submit" id="waSubmitBtn">إرسال المشاركة</button>
-          <a href="#" id="waFallbackLink" target="_blank" rel="noopener" style="display:none; text-align:center; margin-top:.8rem; color:var(--violet); font-weight:600; font-size:.9rem;">إذا لم تفتح الرسالة تلقائياً، اضغطي هنا</a>
-          <p class="wa-note">بعد تحديد وسيلة استقبال المشاركات، سيتم إرسال بياناتك تلقائياً — لا تنسي إرفاق صورة المشاركة يدوياً قبل الإرسال.</p>
+          <p class="wa-note">سيتم حفظ مشاركتك مباشرة، ولن تُفتح أي رسالة أو تطبيق آخر.</p>
         </div>
 
         <div class="end-mark"><span></span><span></span><span></span></div>
@@ -385,13 +385,13 @@
 
 (function(){
   try{
-    var WA_NUMBER = '';
+    var FORM_ENDPOINT = 'https://formspree.io/f/xeaoeeko';
     var tickets = document.querySelectorAll('.ticket');
     var form = document.getElementById('waForm');
     var badge = document.getElementById('waProgramBadge');
     var btn = document.getElementById('waSubmitBtn');
     var errorEl = document.getElementById('waError');
-    var fallback = document.getElementById('waFallbackLink');
+    var successEl = document.getElementById('waSuccess');
     var selectedProgram = '';
 
     tickets.forEach(function(t){
@@ -399,6 +399,8 @@
         e.preventDefault();
         selectedProgram = t.getAttribute('data-program') || '';
         if(badge) badge.textContent = selectedProgram;
+        if(errorEl) errorEl.style.display = 'none';
+        if(successEl) successEl.style.display = 'none';
         if(form){
           form.classList.add('open');
           form.scrollIntoView({behavior:'smooth', block:'start'});
@@ -408,50 +410,68 @@
 
     if(btn){
       btn.addEventListener('click', function(){
-        var guardian = ((document.getElementById('waGuardian') || {}).value || '').trim();
-        var student = ((document.getElementById('waStudent') || {}).value || '').trim();
-        var klass = ((document.getElementById('waClass') || {}).value || '').trim();
-        var text = ((document.getElementById('waText') || {}).value || '').trim();
+        var guardianEl = document.getElementById('waGuardian');
+        var studentEl = document.getElementById('waStudent');
+        var classEl = document.getElementById('waClass');
+        var textEl = document.getElementById('waText');
+        var fileEl = document.getElementById('waFile');
+
+        var guardian = (guardianEl.value || '').trim();
+        var student = (studentEl.value || '').trim();
+        var klass = (classEl.value || '').trim();
+        var text = (textEl.value || '').trim();
 
         if(!guardian || !student || !text){
           if(errorEl){
             errorEl.textContent = 'الرجاء تعبئة: اسم ولي الأمر، اسم الطالبة، ونص المشاركة قبل الإرسال.';
             errorEl.style.display = 'block';
           }
-          return;
-        }
-        if(!WA_NUMBER){
-          if(errorEl){
-            errorEl.textContent = 'لم يتم تحديد وسيلة استقبال المشاركات بعد.';
-            errorEl.style.display = 'block';
-          }
+          if(successEl) successEl.style.display = 'none';
           return;
         }
         if(errorEl) errorEl.style.display = 'none';
 
-        var lines = [
-          'مشاركة جديدة - ' + (selectedProgram || 'برنامج غير محدد'),
-          'اسم ولي أمر الطالبة: ' + guardian,
-          'اسم الطالبة: ' + student,
-          'الصف: ' + (klass || '-'),
-          'نص المشاركة: ' + text,
-          '',
-          '📎 سيتم إرفاق صورة المشاركة يدوياً مع هذه الرسالة.'
-        ];
-        var url = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(lines.join('\n'));
-
-        if(fallback){
-          fallback.href = url;
-          fallback.style.display = 'block';
+        var data = new FormData();
+        data.append('البرنامج', selectedProgram || 'غير محدد');
+        data.append('اسم ولي أمر الطالبة', guardian);
+        data.append('اسم الطالبة', student);
+        data.append('الصف', klass || '-');
+        data.append('نص المشاركة', text);
+        if(fileEl && fileEl.files && fileEl.files[0]){
+          data.append('صورة المشاركة', fileEl.files[0]);
         }
 
-        var a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        btn.disabled = true;
+        btn.textContent = 'جارٍ الإرسال...';
+
+        fetch(FORM_ENDPOINT, {
+          method: 'POST',
+          body: data,
+          headers: { 'Accept': 'application/json' }
+        }).then(function(response){
+          btn.disabled = false;
+          btn.textContent = 'إرسال المشاركة';
+          if(response.ok){
+            if(successEl) successEl.style.display = 'block';
+            guardianEl.value = '';
+            studentEl.value = '';
+            classEl.value = '';
+            textEl.value = '';
+            if(fileEl) fileEl.value = '';
+          } else {
+            if(errorEl){
+              errorEl.textContent = 'حدث خطأ أثناء الإرسال، حاولي مرة أخرى.';
+              errorEl.style.display = 'block';
+            }
+          }
+        }).catch(function(){
+          btn.disabled = false;
+          btn.textContent = 'إرسال المشاركة';
+          if(errorEl){
+            errorEl.textContent = 'تعذّر الاتصال، تأكدي من الإنترنت وحاولي مرة أخرى.';
+            errorEl.style.display = 'block';
+          }
+        });
       });
     }
   }catch(e){}
