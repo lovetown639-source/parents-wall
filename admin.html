@@ -129,11 +129,16 @@
     }
     var rows = [
       ['البرنامج', d.program],
-      ['ولي الأمر', d.guardian],
+      ['ولي الأمر', d.guardian]
+    ];
+    if(d.extraLabel && d.extraValue){
+      rows.push([d.extraLabel, d.extraValue]);
+    }
+    rows.push(
       ['الطالبة', d.student],
       ['الصف', d.klass],
       ['النص', d.text]
-    ];
+    );
     rows.forEach(function(r){
       var row = document.createElement('div');
       row.className = 'row';

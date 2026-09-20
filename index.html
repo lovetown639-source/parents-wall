@@ -337,6 +337,7 @@
         <div class="wa-form" id="waForm">
           <span class="wa-program-badge" id="waProgramBadge"></span>
           <div class="wa-field"><label for="waGuardian">اسم ولي أمر الطالبة</label><input type="text" id="waGuardian"></div>
+          <div class="wa-field" id="waExtraWrap" style="display:none;"><label for="waExtra" id="waExtraLabel">اسم البرنامج</label><input type="text" id="waExtra"></div>
           <div class="wa-field"><label for="waStudent">اسم الطالبة</label><input type="text" id="waStudent"></div>
           <div class="wa-field"><label for="waClass">الصف (اختياري)</label><input type="text" id="waClass"></div>
           <div class="wa-field"><label for="waText">نص المشاركة</label><textarea id="waText"></textarea></div>
@@ -446,6 +447,10 @@
       });
     }
 
+    var extraWrap = document.getElementById('waExtraWrap');
+    var extraLabelEl = document.getElementById('waExtraLabel');
+    var extraEl = document.getElementById('waExtra');
+
     tickets.forEach(function(t){
       t.addEventListener('click', function(e){
         e.preventDefault();
@@ -453,6 +458,20 @@
         if(badge) badge.textContent = selectedProgram;
         if(errorEl) errorEl.style.display = 'none';
         if(successEl) successEl.style.display = 'none';
+
+        if(extraWrap){
+          if(selectedProgram === 'برنامج الأيام العالمية'){
+            if(extraLabelEl) extraLabelEl.textContent = 'اسم اليوم والمناسبة';
+            extraWrap.style.display = 'block';
+          } else if(selectedProgram === 'برنامج مجالات النشاط'){
+            if(extraLabelEl) extraLabelEl.textContent = 'اسم البرنامج';
+            extraWrap.style.display = 'block';
+          } else {
+            extraWrap.style.display = 'none';
+          }
+          if(extraEl) extraEl.value = '';
+        }
+
         if(form){
           form.classList.add('open');
           form.scrollIntoView({behavior:'smooth', block:'start'});
@@ -472,10 +491,14 @@
         var student = (studentEl.value || '').trim();
         var klass = (classEl.value || '').trim();
         var text = (textEl.value || '').trim();
+        var extraLabel = (extraWrap && extraWrap.style.display !== 'none' && extraLabelEl) ? extraLabelEl.textContent : '';
+        var extraValue = (extraWrap && extraWrap.style.display !== 'none' && extraEl) ? extraEl.value.trim() : '';
 
-        if(!guardian || !student || !text){
+        if(!guardian || !student || !text || (extraLabel && !extraValue)){
           if(errorEl){
-            errorEl.textContent = 'الرجاء تعبئة: اسم ولي الأمر، اسم الطالبة، ونص المشاركة قبل الإرسال.';
+            errorEl.textContent = extraLabel
+              ? ('الرجاء تعبئة: اسم ولي الأمر، ' + extraLabel + '، اسم الطالبة، ونص المشاركة قبل الإرسال.')
+              : 'الرجاء تعبئة: اسم ولي الأمر، اسم الطالبة، ونص المشاركة قبل الإرسال.';
             errorEl.style.display = 'block';
           }
           if(successEl) successEl.style.display = 'none';
@@ -496,6 +519,8 @@
           return db.collection('submissions').add({
             program: selectedProgram || 'غير محدد',
             guardian: guardian,
+            extraLabel: extraLabel || '',
+            extraValue: extraValue || '',
             student: student,
             klass: klass || '-',
             text: text,
@@ -511,6 +536,7 @@
           studentEl.value = '';
           classEl.value = '';
           textEl.value = '';
+          if(extraEl) extraEl.value = '';
           if(fileEl) fileEl.value = '';
         }).catch(function(err){
           btn.disabled = false;
