@@ -162,6 +162,13 @@
   .wa-submit:hover{ filter:brightness(1.08); }
   .wa-note{ font-size:.8rem; color:var(--ink-muted); margin-top:.9rem; text-align:center; line-height:1.7; }
 
+  .gallery-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:1.2rem; margin-top:2rem; text-align:right; }
+  .gallery-card{ background:rgba(255,255,255,.9); border:1px solid var(--rule); border-radius:16px; padding:1rem; box-shadow:0 10px 30px -20px rgba(20,18,25,.35); }
+  .gallery-card img{ width:100%; border-radius:10px; margin-bottom:.8rem; display:block; object-fit:cover; max-height:220px; }
+  .gallery-card .g-student{ font-weight:700; color:var(--violet); margin-bottom:.3rem; }
+  .gallery-card .g-text{ font-size:.9rem; color:var(--paper); line-height:1.7; }
+  .gallery-empty{ color:var(--ink-muted); font-size:.95rem; }
+
   @media (max-width:560px){ .wordmark{ font-size:.75rem; } }
   @media (prefers-reduced-motion: reduce){ .paint-dot, .spark, .scroll-cue svg{ animation:none !important; } .reveal{ transition:none !important; } }
 </style>
@@ -337,7 +344,7 @@
           <p class="wa-error" id="waError" style="display:none; color:#c0392b; font-size:.85rem; margin-bottom:.9rem;"></p>
           <p class="wa-success" id="waSuccess" style="display:none; color:#1f9c86; font-weight:700; font-size:1rem; text-align:center; padding:1rem 0;">تم إرسال مشاركتك بنجاح، شكراً لك! 🌸</p>
           <button type="button" class="wa-submit" id="waSubmitBtn">إرسال المشاركة</button>
-          <p class="wa-note">سيتم حفظ مشاركتك مباشرة، ولن تُفتح أي رسالة أو تطبيق آخر.</p>
+          <p class="wa-note">سيتم حفظ مشاركتك للمراجعة، وستظهر في لوحة المشاركات أسفل الصفحة بعد الموافقة عليها من إدارة المدرسة — بدون فتح أي رسالة أو تطبيق آخر.</p>
         </div>
 
         <div class="end-mark"><span></span><span></span><span></span></div>
@@ -345,8 +352,21 @@
     </div>
   </section>
 
+  <section class="scene" id="gallery">
+    <div class="scene-row">
+      <div class="scene-inner reveal" style="max-width:44rem;">
+        <p class="eyebrow">لوحة المشاركات</p>
+        <h2>مشاركات أولياء الأمور</h2>
+        <div class="gallery-grid" id="galleryGrid"></div>
+        <p class="gallery-empty" id="galleryEmpty">لا توجد مشاركات منشورة بعد.</p>
+      </div>
+    </div>
+  </section>
+
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
@@ -385,7 +405,6 @@
 
 (function(){
   try{
-    var FORM_ENDPOINT = 'https://formspree.io/f/xeaoeeko';
     var tickets = document.querySelectorAll('.ticket');
     var form = document.getElementById('waForm');
     var badge = document.getElementById('waProgramBadge');
@@ -393,6 +412,39 @@
     var errorEl = document.getElementById('waError');
     var successEl = document.getElementById('waSuccess');
     var selectedProgram = '';
+
+    var firebaseConfig = {
+      apiKey: "AIzaSyARFQTEqJIH5WfA0pIEZQNzhzUuzKkYdtE",
+      authDomain: "parents-wall.firebaseapp.com",
+      projectId: "parents-wall",
+      storageBucket: "parents-wall.firebasestorage.app",
+      messagingSenderId: "800264935791",
+      appId: "1:800264935791:web:bfc80b7ef266d9ce90b09a"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.firestore();
+
+    function compressImage(file, maxDim, quality){
+      return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(e){
+          var img = new Image();
+          img.onload = function(){
+            var w = img.width, h = img.height;
+            if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else if(h >= w && h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+            var canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = function(){ reject(new Error('IMG')); };
+          img.src = e.target.result;
+        };
+        reader.onerror = function(){ reject(new Error('READ')); };
+        reader.readAsDataURL(file);
+      });
+    }
 
     tickets.forEach(function(t){
       t.addEventListener('click', function(e){
@@ -431,48 +483,83 @@
         }
         if(errorEl) errorEl.style.display = 'none';
 
-        var data = new FormData();
-        data.append('البرنامج', selectedProgram || 'غير محدد');
-        data.append('اسم ولي أمر الطالبة', guardian);
-        data.append('اسم الطالبة', student);
-        data.append('الصف', klass || '-');
-        data.append('نص المشاركة', text);
-        if(fileEl && fileEl.files && fileEl.files[0]){
-          data.append('صورة المشاركة', fileEl.files[0]);
-        }
-
         btn.disabled = true;
         btn.textContent = 'جارٍ الإرسال...';
 
-        fetch(FORM_ENDPOINT, {
-          method: 'POST',
-          body: data,
-          headers: { 'Accept': 'application/json' }
-        }).then(function(response){
+        var hasFile = fileEl && fileEl.files && fileEl.files[0];
+        var photoPromise = hasFile ? compressImage(fileEl.files[0], 900, 0.6) : Promise.resolve('');
+
+        photoPromise.then(function(photoDataUrl){
+          if(photoDataUrl && photoDataUrl.length > 900000){
+            throw new Error('SIZE');
+          }
+          return db.collection('submissions').add({
+            program: selectedProgram || 'غير محدد',
+            guardian: guardian,
+            student: student,
+            klass: klass || '-',
+            text: text,
+            photo: photoDataUrl || '',
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }).then(function(){
           btn.disabled = false;
           btn.textContent = 'إرسال المشاركة';
-          if(response.ok){
-            if(successEl) successEl.style.display = 'block';
-            guardianEl.value = '';
-            studentEl.value = '';
-            classEl.value = '';
-            textEl.value = '';
-            if(fileEl) fileEl.value = '';
-          } else {
-            if(errorEl){
-              errorEl.textContent = 'حدث خطأ أثناء الإرسال، حاولي مرة أخرى.';
-              errorEl.style.display = 'block';
-            }
-          }
-        }).catch(function(){
+          if(successEl) successEl.style.display = 'block';
+          guardianEl.value = '';
+          studentEl.value = '';
+          classEl.value = '';
+          textEl.value = '';
+          if(fileEl) fileEl.value = '';
+        }).catch(function(err){
           btn.disabled = false;
           btn.textContent = 'إرسال المشاركة';
           if(errorEl){
-            errorEl.textContent = 'تعذّر الاتصال، تأكدي من الإنترنت وحاولي مرة أخرى.';
+            errorEl.textContent = (err && err.message === 'SIZE')
+              ? 'حجم الصورة كبير جداً، جربي صورة أصغر.'
+              : 'تعذّر الإرسال، تأكدي من الإنترنت وحاولي مرة أخرى.';
             errorEl.style.display = 'block';
           }
         });
       });
+    }
+
+    var galleryGrid = document.getElementById('galleryGrid');
+    var galleryEmpty = document.getElementById('galleryEmpty');
+    if(galleryGrid){
+      db.collection('submissions').where('status', '==', 'approved').onSnapshot(function(snap){
+        galleryGrid.innerHTML = '';
+        if(snap.empty){
+          if(galleryEmpty) galleryEmpty.style.display = 'block';
+          return;
+        }
+        if(galleryEmpty) galleryEmpty.style.display = 'none';
+        var docs = snap.docs.slice().sort(function(a, b){
+          var ta = (a.data().createdAt && a.data().createdAt.toMillis) ? a.data().createdAt.toMillis() : 0;
+          var tb = (b.data().createdAt && b.data().createdAt.toMillis) ? b.data().createdAt.toMillis() : 0;
+          return tb - ta;
+        });
+        docs.forEach(function(doc){
+          var d = doc.data();
+          var card = document.createElement('div');
+          card.className = 'gallery-card';
+          if(d.photo){
+            var img = document.createElement('img');
+            img.src = d.photo;
+            card.appendChild(img);
+          }
+          var nameEl = document.createElement('div');
+          nameEl.className = 'g-student';
+          nameEl.textContent = d.student || '';
+          card.appendChild(nameEl);
+          var textEl = document.createElement('div');
+          textEl.className = 'g-text';
+          textEl.textContent = d.text || '';
+          card.appendChild(textEl);
+          galleryGrid.appendChild(card);
+        });
+      }, function(){});
     }
   }catch(e){}
 })();
