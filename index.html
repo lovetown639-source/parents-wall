@@ -339,6 +339,7 @@
           <span class="wa-program-badge" id="waProgramBadge"></span>
           <div class="wa-field"><label for="waGuardian">اسم ولي أمر الطالبة</label><input type="text" id="waGuardian"></div>
           <div class="wa-field" id="waExtraWrap" style="display:none;"><label for="waExtra" id="waExtraLabel">اسم البرنامج</label><input type="text" id="waExtra"></div>
+          <div class="wa-field"><label for="waTeacher">اسم المعلمة</label><input type="text" id="waTeacher"></div>
           <div class="wa-field"><label for="waStudent">اسم الطالبة</label><input type="text" id="waStudent"></div>
           <div class="wa-field"><label for="waClass">الصف (اختياري)</label><input type="text" id="waClass"></div>
           <div class="wa-field"><label for="waText">نص المشاركة</label><textarea id="waText"></textarea></div>
@@ -483,23 +484,25 @@
     if(btn){
       btn.addEventListener('click', function(){
         var guardianEl = document.getElementById('waGuardian');
+        var teacherEl = document.getElementById('waTeacher');
         var studentEl = document.getElementById('waStudent');
         var classEl = document.getElementById('waClass');
         var textEl = document.getElementById('waText');
         var fileEl = document.getElementById('waFile');
 
         var guardian = (guardianEl.value || '').trim();
+        var teacher = (teacherEl.value || '').trim();
         var student = (studentEl.value || '').trim();
         var klass = (classEl.value || '').trim();
         var text = (textEl.value || '').trim();
         var extraLabel = (extraWrap && extraWrap.style.display !== 'none' && extraLabelEl) ? extraLabelEl.textContent : '';
         var extraValue = (extraWrap && extraWrap.style.display !== 'none' && extraEl) ? extraEl.value.trim() : '';
 
-        if(!guardian || !student || !text || (extraLabel && !extraValue)){
+        if(!guardian || !teacher || !student || !text || (extraLabel && !extraValue)){
           if(errorEl){
             errorEl.textContent = extraLabel
-              ? ('الرجاء تعبئة: اسم ولي الأمر، ' + extraLabel + '، اسم الطالبة، ونص المشاركة قبل الإرسال.')
-              : 'الرجاء تعبئة: اسم ولي الأمر، اسم الطالبة، ونص المشاركة قبل الإرسال.';
+              ? ('الرجاء تعبئة: اسم ولي الأمر، ' + extraLabel + '، اسم المعلمة، اسم الطالبة، ونص المشاركة قبل الإرسال.')
+              : 'الرجاء تعبئة: اسم ولي الأمر، اسم المعلمة، اسم الطالبة، ونص المشاركة قبل الإرسال.';
             errorEl.style.display = 'block';
           }
           if(successEl) successEl.style.display = 'none';
@@ -520,6 +523,7 @@
           return db.collection('submissions').add({
             program: selectedProgram || 'غير محدد',
             guardian: guardian,
+            teacher: teacher,
             extraLabel: extraLabel || '',
             extraValue: extraValue || '',
             student: student,
@@ -534,6 +538,7 @@
           btn.textContent = 'إرسال المشاركة';
           if(successEl) successEl.style.display = 'block';
           guardianEl.value = '';
+          teacherEl.value = '';
           studentEl.value = '';
           classEl.value = '';
           textEl.value = '';
